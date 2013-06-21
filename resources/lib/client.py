@@ -93,23 +93,19 @@ class XBMCMailClient(object):
         self.selected_mailbox = mailbox
         return int(data[0])
 
-    def _get_email_ids(self, mailbox=None, criteria=None):
+    def _get_email_ids(self, mailbox=None):
         if mailbox and mailbox != self.selected_mailbox:
             self._select_mailbox(mailbox)
         if not self.selected_mailbox:
             raise ValueError('No Mailbox selected')
-        if criteria is None:
-            criteria = DEFAULT_SEARCH_CRITERIA
-        self.log('search %s' % criteria)
-        ret, data = self.connection.search(None, criteria)
+        self.log('search %s' % DEFAULT_SEARCH_CRITERIA)
+        ret, data = self.connection.search(None, DEFAULT_SEARCH_CRITERIA)
         self.log(ret)
         email_ids = data[0].split()
         email_ids.reverse()
         return email_ids
 
-    def _fetch_emails_by_ids(self, email_ids, mailbox=None, parts=None):
-        if parts is None:
-            parts = DEFAULT_FETCH_PARTS
+    def _fetch_emails_by_ids(self, email_ids, mailbox=None):
         if mailbox and mailbox != self.selected_mailbox:
             self._select_mailbox(mailbox)
         if not self.selected_mailbox:
@@ -117,7 +113,7 @@ class XBMCMailClient(object):
         if isinstance(email_ids, (list, tuple)):
             email_ids = ','.join(email_ids)
         self.log('fetch %s' % email_ids)
-        ret, data = self.connection.fetch(email_ids, parts)
+        ret, data = self.connection.fetch(email_ids, DEFAULT_FETCH_PARTS)
         self.log(ret)
         data = (d for d in data if isinstance(d, tuple))
         header_parser = HeaderParser()
