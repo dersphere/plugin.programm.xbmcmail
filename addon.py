@@ -29,7 +29,7 @@ plugin = Plugin()
 
 
 @plugin.route('/')
-def show_root():
+def show_mailboxes():
 
     def _format_label(mailbox):
         label = mailbox['name']
@@ -51,7 +51,7 @@ def show_root():
     return plugin.finish(items)
 
 
-@plugin.route('/<mailbox>/')
+@plugin.route('/mailbox/<mailbox>/')
 def show_mailbox(mailbox):
 
     def context_menu(mailbox, email):
@@ -109,19 +109,19 @@ def show_mailbox(mailbox):
     return plugin.finish(items)
 
 
-@plugin.route('/<mailbox>/<email_id>/mark_seen')
+@plugin.route('/mailbox/<mailbox>/<email_id>/mark_seen')
 def email_mark_seen(mailbox, email_id):
     client.email_mark_seen(email_id, mailbox)
     _refresh_view()
 
 
-@plugin.route('/<mailbox>/<email_id>/mark_unseen')
+@plugin.route('/mailbox/<mailbox>/<email_id>/mark_unseen')
 def email_mark_unseen(mailbox, email_id):
     client.email_mark_unseen(email_id, mailbox)
     _refresh_view()
 
 
-@plugin.route('/<mailbox>/<email_id>/delete')
+@plugin.route('/mailbox/<mailbox>/<email_id>/delete')
 def email_delete(mailbox, email_id):
     confirmed = xbmcgui.Dialog().yesno(
         _('delete'),
@@ -133,7 +133,7 @@ def email_delete(mailbox, email_id):
     _refresh_view()
 
 
-@plugin.route('/<mailbox>/<email_id>/show')
+@plugin.route('/mailbox/<mailbox>/<email_id>/show')
 def email_show(mailbox, email_id):
     xbmc.executebuiltin('ActivateWindow(%d)' % 10147)
     window = xbmcgui.Window(10147)
