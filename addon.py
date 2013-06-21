@@ -30,8 +30,19 @@ plugin = Plugin()
 
 @plugin.route('/')
 def show_root():
+
+    def _format_label(mailbox):
+        label = mailbox['name']
+        if 'unseen' in mailbox and 'total' in mailbox:
+            label = u'%s (%d/%d)' % (
+                label,
+                int(mailbox['unseen']),
+                int(mailbox['total']),
+            )
+        return label
+
     items = [{
-        'label': mailbox['name'],
+        'label': _format_label(mailbox),
         'path': plugin.url_for(
             endpoint='show_mailbox',
             mailbox=mailbox['name'],

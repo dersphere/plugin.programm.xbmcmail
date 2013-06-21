@@ -24,6 +24,7 @@ from email.Header import decode_header
 
 DEFAULT_FETCH_PARTS = '(BODY.PEEK[HEADER] FLAGS)'
 DEFAULT_SEARCH_CRITERIA = 'UNDELETED'
+DEFAULT_MAILBOX_STATS = '(MESSAGES UNSEEN)'
 
 
 class UnknownError(Exception):
@@ -38,6 +39,7 @@ class XBMCMailClient(object):
 
     re_list_response = re.compile(r'\((.*?)\) "(.*)" (.*)')
     re_fetch_response = re.compile(r'([^ ]+) \(FLAGS \((.*?)\)')
+    re_status_response = re.compile(r'.*\(MESSAGES (.+) UNSEEN (.+)\)')
 
     def __init__(self, username=None, password=None, host=None, use_ssl=True):
         self.log('connecting to server %s' % host)
@@ -60,21 +62,27 @@ class XBMCMailClient(object):
     def __parse_list_response(self, line):
         flags, delimiter, name = self.re_list_response.match(line).groups()
         name = name.strip('"')
-        return (flags, delimiter, name)
+        return flags, delimiter, name
 
     def __parse_fetch_response(self, line):
         email_id, flags_str = self.re_fetch_response.match(line).groups()
-        return (email_id, flags_str)
+        return email_id, flags_str
+
+    def __parse_status_response(self, line):
+        try:
+            total, unseen = self.re_status_response.match(line).groups()
+        except AttributeError:
+            return (0, 0)
+        return total, unseen
 
     def __parse_header(self, line):
         if line:
             return decode_header(line)[0][0]
         return 'FIXME'
 
-    def _list_mailboxes(self, *args, **kwargs):
-        # FIXME: parse status
+    def _list_mailboxes(self):
         self.log('list')
-        ret, data = self.connection.list(*args, **kwargs)
+        ret, data = self.connection.list()
         self.log(ret)
         return (self.__parse_list_response(line) for line in data)
 
@@ -119,11 +127,23 @@ class XBMCMailClient(object):
         )
         return data
 
-    def get_mailboxes(self, *args, **kwargs):
+    def _get_mailbox_status(self, mailbox):
+        self.log('status %s' % mailbox)
+        ret, data = self.connection.status(mailbox, DEFAULT_MAILBOX_STATS)
+        self.log(ret)
+        total, unseen = self.__parse_status_response(data[0])
+        return total, unseen
+
+    def get_mailboxes(self, fetch_status=True):
         mailboxes = [{
             'name': name,
             'has_children': 'HasChildren' in flags,
-        } for flags, d, name in self._list_mailboxes(*args, **kwargs)]
+        } for flags, d, name in self._list_mailboxes()]
+        if fetch_status:
+            for mailbox in mailboxes:
+                total, unseen = self._get_mailbox_status(mailbox['name'])
+                mailbox['total'] = total
+                mailbox['unseen'] = unseen
         return mailboxes
 
     def get_emails(self, mailbox=None, limit=10, offset=0):
