@@ -31,17 +31,17 @@ plugin = Plugin()
 @plugin.route('/')
 def show_root():
     items = [{
-        'label': folder['name'],
+        'label': mailbox['name'],
         'path': plugin.url_for(
-            endpoint='show_folder',
-            folder_id=folder['folder_id'],
+            endpoint='show_mailbox',
+            mailbox=mailbox['name'],
         )
-    } for folder in client.get_folders()]
+    } for mailbox in client.get_mailboxes()]
     return plugin.finish(items)
 
 
-@plugin.route('/<folder_id>/')
-def show_folder(folder_id):
+@plugin.route('/<mailbox>/')
+def show_mailbox(mailbox):
 
     def _format_from(s):
         if ' <' in s:
@@ -58,27 +58,24 @@ def show_folder(folder_id):
             _format_subject(email['subject']),
         ),
         'path': plugin.url_for(
-            endpoint='show_folder',
-            folder_id=email['id'],
+            endpoint='show_mailbox',
+            mailbox=email['id'],
         )
-    } for email in client.get_emails(folder_id)]
+    } for email in client.get_emails(mailbox)]
     return plugin.finish(items)
 
 
-def get_client():
+def login():
     logged_in = False
-    client = XBMCMailClient()
     while not logged_in:
         try:
-            logged_in = client.connect(
+            client = XBMCMailClient(
                 username=plugin.get_setting('username', unicode),
                 password=plugin.get_setting('password', unicode),
                 host=plugin.get_setting('host', unicode),
                 use_ssl=plugin.get_setting('use_ssl', bool),
             )
         except InvalidCredentials:
-            logged_in = False
-        if not logged_in:
             try_again = xbmcgui.Dialog().yesno(
                 _('connection_error'),
                 _('wrong_credentials'),
@@ -87,6 +84,8 @@ def get_client():
             if not try_again:
                 return
             plugin.open_settings()
+        else:
+            logged_in = True
     return client
 
 
@@ -99,7 +98,7 @@ def _(string_id):
 
 
 if __name__ == '__main__':
-    client = get_client()
+    client = login()
     if client:
         plugin.run()
         client.logout()

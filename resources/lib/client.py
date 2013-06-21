@@ -17,10 +17,17 @@
 #    along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from email.parser import HeaderParser
-from email.Header import decode_header
 import imaplib
 import re
+from email.parser import HeaderParser
+from email.Header import decode_header
+
+DEFAULT_FETCH_PARTS = '(BODY.PEEK[HEADER])'
+DEFAULT_SEARCH_CRITERIA = 'UNDELETED'
+
+
+class UnknownError(Exception):
+    pass
 
 
 class InvalidCredentials(Exception):
@@ -31,10 +38,23 @@ class XBMCMailClient(object):
 
     re_list_response = re.compile(r'\((.*?)\) "(.*)" (.*)')
 
-    def __init__(self, *args, **kwargs):
-        self._reset_connection()
-        if args or kwargs:
-            self.connect(*args, **kwargs)
+    def __init__(self, username=None, password=None, host=None, use_ssl=True):
+        self.log('connecting to server %s' % host)
+        cls = imaplib.IMAP4_SSL if use_ssl else imaplib.IMAP4
+        try:
+            self.connection = cls(host)
+            self.connection.login(username, password)
+        except cls.error, error:
+            self.log(error)
+            if 'credentials' in error.message.lower():
+                raise InvalidCredentials(error)
+            else:
+                raise UnknownError(error)
+        self.selected_mailbox = None
+        self.logged_in = True
+        self.username = username
+        self.host = host
+        self.log('connected.')
 
     def __parse_list_response(self, line):
         flags, delimiter, name = self.re_list_response.match(line).groups()
@@ -46,105 +66,85 @@ class XBMCMailClient(object):
             return decode_header(line)[0][0]
         return 'FIXME'
 
-    def _reset_connection(self):
-        self.connected = False
-        self.connection = None
-        self.selected = None
-
-    def connect(self, username=None, password=None, host=None, use_ssl=True):
-        self.log('connecting to server %s' % host)
-        try:
-            cls = imaplib.IMAP4_SSL if use_ssl else imaplib.IMAP4
-            self.connection = cls(host)
-            self.connection.login(username, password)
-        except cls.error, error:
-            self.log(error)
-            self._reset_connection()
-            if 'credentials' in error.message.lower():
-                raise InvalidCredentials(error)
-            else:
-                raise error
-        self.connected = True
-        self.log('connected.')
-        return self.connected
-
-    def _list_folders(self, *args, **kwargs):
+    def _list_mailboxes(self, *args, **kwargs):
         # FIXME: parse status
         self.log('list')
         ret, data = self.connection.list(*args, **kwargs)
         self.log(ret)
         return (self.__parse_list_response(line) for line in data)
 
-    def _select_folder(self, folder_id, *args, **kwargs):
-        self.log('select %s' % folder_id)
-        ret, data = self.connection.select(folder_id)
+    def _select_mailbox(self, mailbox):
+        self.log('select %s' % mailbox)
+        ret, data = self.connection.select(mailbox)
         self.log(ret)
-        self.selected = folder_id
+        self.selected_mailbox = mailbox
         return int(data[0])
 
-    def _get_email_ids(self, folder_id=None, criteria='UNDELETED'):
-        if folder_id and folder_id != self.selected:
-            self._select_folder(folder_id)
-        if not self.selected:
-            raise Exception
+    def _get_email_ids(self, mailbox=None, criteria=None):
+        if mailbox and mailbox != self.selected_mailbox:
+            self._select_mailbox(mailbox)
+        if not self.selected_mailbox:
+            raise ValueError('No Mailbox selected')
+        if criteria is None:
+            criteria =  DEFAULT_SEARCH_CRITERIA
         self.log('search %s' % criteria)
         ret, data = self.connection.search(None, criteria)
         self.log(ret)
-        message_ids = data[0].split()
-        message_ids.reverse()
-        return message_ids
+        email_ids = data[0].split()
+        email_ids.reverse()
+        return email_ids
 
-    def _fetch_emails_by_ids(self, message_ids, folder_id=None, parts='(BODY.PEEK[HEADER])'):
-        if folder_id and folder_id != self.selected:
-            self._select_folder(folder_id)
-        if not self.selected:
-            raise Exception
-        if isinstance(message_ids, (list, tuple)):
-            message_ids = ','.join(message_ids)
+    def _fetch_emails_by_ids(self, email_ids, mailbox=None, parts=None):
+        if parts is None:
+            parts = DEFAULT_FETCH_PARTS
+        if mailbox and mailbox != self.selected_mailbox:
+            self._select_mailbox(mailbox)
+        if not self.selected_mailbox:
+            raise ValueError('No Mailbox selected')
+        if isinstance(email_ids, (list, tuple)):
+            email_ids = ','.join(email_ids)
         MESSAGE_PARTS = '(BODY.PEEK[HEADER])'
-        self.log('fetch %s' % message_ids)
-        ret, data = self.connection.fetch(message_ids, parts)
+        self.log('fetch %s' % email_ids)
+        ret, data = self.connection.fetch(email_ids, parts)
         self.log(ret)
         data = (d for d in data if isinstance(d, tuple))
         parser = HeaderParser()
         data = ((i.split()[0], parser.parsestr(h)) for i, h in data)
         return data
 
-    def get_folders(self, *args, **kwargs):
-        folders = [{
+    def get_mailboxes(self, *args, **kwargs):
+        mailboxes = [{
             'name': name,
-            'folder_id': name,
             'has_children': 'HasChildren' in flags,
-        } for flags, d, name in self._list_folders(*args, **kwargs)]
-        return folders
+        } for flags, d, name in self._list_mailboxes(*args, **kwargs)]
+        return mailboxes
 
-    def get_emails(self, folder_id, limit=100, offset=0):
-        num_mails = self._select_folder(folder_id)
+    def get_emails(self, mailbox=None, limit=100, offset=0):
+        email_ids = self._get_email_ids(mailbox)
+        email_ids = email_ids[offset:limit + offset]
 
-        message_ids = self._get_email_ids()
-        message_ids = message_ids[offset:limit + offset]
+        emails = [{
+            'id': email_id,
+            'subject': self.__parse_header(email.get('Subject')),
+            'from': self.__parse_header(email.get('From')),
+        } for email_id, email in self._fetch_emails_by_ids(email_ids)]
+        emails.reverse()
+        return emails
 
-        messages = [{
-            'id': msg_id,
-            'subject': self.__parse_header(msg.get('Subject')),
-            'from': self.__parse_header(msg.get('From')),
-        } for msg_id, msg in self._fetch_emails_by_ids(message_ids)]
-        messages.reverse()
-        return messages
-
-    def get_email(self, email_id):
+    def get_email(self, email_id, mailbox=None, parts=None):
         pass
 
     def log(self, text):
         print u'[%s]: %s' % (self.__class__.__name__, repr(text))
 
     def logout(self):
-        if self.connected:
-            self.log('closing connection...')
-            if self.selected:
+        if self.logged_in:
+            self.log('Logging out...')
+            if self.selected_mailbox:
                 self.connection.close()
+                self.log('Mailbox deselected.')
             self.connection.logout()
-            self.log('closed.')
+            self.log('Logged out.')
 
     def __del__(self):
         self.logout()
