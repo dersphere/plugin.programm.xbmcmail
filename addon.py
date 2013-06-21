@@ -43,6 +43,15 @@ def show_root():
 @plugin.route('/<mailbox>/')
 def show_mailbox(mailbox):
 
+    def _format_label(email):
+        label = '[B]%s[/B] - %s' % (
+            _format_from(email['from']),
+            _format_subject(email['subject']),
+        )
+        if email['unread']:
+            label = '[COLOR red]%s[/COLOR]' % label
+        return label
+
     def _format_from(s):
         if ' <' in s:
             return s.split(' <')[0].strip('"')
@@ -53,10 +62,7 @@ def show_mailbox(mailbox):
         return s.replace('\r\n', '')
 
     items = [{
-        'label': '[B]%s[/B] - %s' % (
-            _format_from(email['from']),
-            _format_subject(email['subject']),
-        ),
+        'label': _format_label(email),
         'path': plugin.url_for(
             endpoint='show_mailbox',
             mailbox=email['id'],

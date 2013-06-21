@@ -22,7 +22,7 @@ import re
 from email.parser import HeaderParser
 from email.Header import decode_header
 
-DEFAULT_FETCH_PARTS = '(BODY.PEEK[HEADER])'
+DEFAULT_FETCH_PARTS = '(BODY.PEEK[HEADER] FLAGS)'
 DEFAULT_SEARCH_CRITERIA = 'UNDELETED'
 
 
@@ -37,6 +37,7 @@ class InvalidCredentials(Exception):
 class XBMCMailClient(object):
 
     re_list_response = re.compile(r'\((.*?)\) "(.*)" (.*)')
+    re_fetch_response = re.compile(r'([^ ]+) \(FLAGS \((.*?)\)')
 
     def __init__(self, username=None, password=None, host=None, use_ssl=True):
         self.log('connecting to server %s' % host)
@@ -60,6 +61,10 @@ class XBMCMailClient(object):
         flags, delimiter, name = self.re_list_response.match(line).groups()
         name = name.strip('"')
         return (flags, delimiter, name)
+
+    def __parse_fetch_response(self, line):
+        email_id, flags_str = self.re_fetch_response.match(line).groups()
+        return (email_id, flags_str)
 
     def __parse_header(self, line):
         if line:
@@ -86,7 +91,7 @@ class XBMCMailClient(object):
         if not self.selected_mailbox:
             raise ValueError('No Mailbox selected')
         if criteria is None:
-            criteria =  DEFAULT_SEARCH_CRITERIA
+            criteria = DEFAULT_SEARCH_CRITERIA
         self.log('search %s' % criteria)
         ret, data = self.connection.search(None, criteria)
         self.log(ret)
@@ -103,13 +108,15 @@ class XBMCMailClient(object):
             raise ValueError('No Mailbox selected')
         if isinstance(email_ids, (list, tuple)):
             email_ids = ','.join(email_ids)
-        MESSAGE_PARTS = '(BODY.PEEK[HEADER])'
         self.log('fetch %s' % email_ids)
         ret, data = self.connection.fetch(email_ids, parts)
         self.log(ret)
         data = (d for d in data if isinstance(d, tuple))
-        parser = HeaderParser()
-        data = ((i.split()[0], parser.parsestr(h)) for i, h in data)
+        header_parser = HeaderParser()
+        data = (
+            (self.__parse_fetch_response(status), header_parser.parsestr(header))
+            for status, header in data
+        )
         return data
 
     def get_mailboxes(self, *args, **kwargs):
@@ -119,7 +126,7 @@ class XBMCMailClient(object):
         } for flags, d, name in self._list_mailboxes(*args, **kwargs)]
         return mailboxes
 
-    def get_emails(self, mailbox=None, limit=100, offset=0):
+    def get_emails(self, mailbox=None, limit=10, offset=0):
         email_ids = self._get_email_ids(mailbox)
         email_ids = email_ids[offset:limit + offset]
 
@@ -127,7 +134,8 @@ class XBMCMailClient(object):
             'id': email_id,
             'subject': self.__parse_header(email.get('Subject')),
             'from': self.__parse_header(email.get('From')),
-        } for email_id, email in self._fetch_emails_by_ids(email_ids)]
+            'unread': not 'seen' in flags_str.lower(),
+        } for (email_id, flags_str), email in self._fetch_emails_by_ids(email_ids)]
         emails.reverse()
         return emails
 
