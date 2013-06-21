@@ -134,13 +134,43 @@ class XBMCMailClient(object):
             'id': email_id,
             'subject': self.__parse_header(email.get('Subject')),
             'from': self.__parse_header(email.get('From')),
-            'unread': not 'seen' in flags_str.lower(),
+            'unseen': not 'seen' in flags_str.lower(),
         } for (email_id, flags_str), email in self._fetch_emails_by_ids(email_ids)]
         emails.reverse()
         return emails
 
     def get_email(self, email_id, mailbox=None, parts=None):
         pass
+
+    def email_mark_seen(self, mail_id, mailbox=None):
+        if mailbox and mailbox != self.selected_mailbox:
+            self._select_mailbox(mailbox)
+        if not self.selected_mailbox:
+            raise ValueError('No Mailbox selected')
+        self.log('store +SEEN')
+        ret, data = self.connection.store(mail_id, '+FLAGS', '(\\Seen)')
+        self.log(ret)
+
+    def email_mark_unseen(self, mail_id, mailbox=None):
+        if mailbox and mailbox != self.selected_mailbox:
+            self._select_mailbox(mailbox)
+        if not self.selected_mailbox:
+            raise ValueError('No Mailbox selected')
+        self.log('store -SEEN')
+        ret, data = self.connection.store(mail_id, '-FLAGS', '(\\Seen)')
+        self.log(ret)
+
+    def email_delete(self, mail_id, mailbox=None):
+        if mailbox and mailbox != self.selected_mailbox:
+            self._select_mailbox(mailbox)
+        if not self.selected_mailbox:
+            raise ValueError('No Mailbox selected')
+        self.log('store +DELETE')
+        ret, data = self.connection.store(mail_id, '+FLAGS', '(\\Deleted)')
+        self.log(ret)
+        self.log('expunge')
+        typ, response = self.connection.expunge()
+        self.log(ret)
 
     def log(self, text):
         print u'[%s]: %s' % (self.__class__.__name__, repr(text))
