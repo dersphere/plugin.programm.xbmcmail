@@ -19,10 +19,11 @@
 
 import imaplib
 import re
-from email.parser import HeaderParser
+from email.parser import HeaderParser, Parser
 from email.Header import decode_header
 
 DEFAULT_FETCH_PARTS = '(BODY.PEEK[HEADER] FLAGS)'
+DEFAULT_FETCH_ALL = '(RFC822)'
 DEFAULT_SEARCH_CRITERIA = 'UNDELETED'
 DEFAULT_MAILBOX_STATS = '(MESSAGES UNSEEN)'
 
@@ -75,7 +76,7 @@ class XBMCMailClient(object):
             return (0, 0)
         return total, unseen
 
-    def __parse_header(self, line):
+    def __decode(self, line):
         if line:
             return decode_header(line)[0][0]
         return 'FIXME'
@@ -116,9 +117,9 @@ class XBMCMailClient(object):
         ret, data = self.connection.fetch(email_ids, DEFAULT_FETCH_PARTS)
         self.log(ret)
         data = (d for d in data if isinstance(d, tuple))
-        header_parser = HeaderParser()
+        parser = HeaderParser()
         data = (
-            (self.__parse_fetch_response(status), header_parser.parsestr(header))
+            (self.__parse_fetch_response(status), parser.parsestr(header))
             for status, header in data
         )
         return data
@@ -149,15 +150,38 @@ class XBMCMailClient(object):
         emails = [{
             'id': email_id,
             'mailbox': mailbox,
-            'subject': self.__parse_header(email.get('Subject')),
-            'from': self.__parse_header(email.get('From')),
-            'unseen': not 'seen' in flags_str.lower(),
-        } for (email_id, flags_str), email in self._fetch_emails_by_ids(email_ids)]
+            'subject': self.__decode(email.get('Subject')),
+            'from': self.__decode(email.get('From')),
+            'unseen': not 'Seen' in flags,
+        } for (email_id, flags), email in self._fetch_emails_by_ids(email_ids)]
         emails.reverse()
         return emails
 
-    def get_email(self, email_id, mailbox=None, parts=None):
-        pass
+    def get_email(self, email_id, mailbox=None):
+        if mailbox and mailbox != self.selected_mailbox:
+            self._select_mailbox(mailbox)
+        if not self.selected_mailbox:
+            raise ValueError('No Mailbox selected')
+        self.log('fetch %s' % email_id)
+        ret, data = self.connection.fetch(email_id, DEFAULT_FETCH_ALL)
+        self.log(ret)
+        data = [d for d in data if isinstance(d, tuple)][0]
+        parser = Parser()
+        parsed_email = parser.parsestr(data[1])
+        body_text = ''
+        for part in parsed_email.walk():
+            if part.get_content_type() == 'text/plain':
+                body_text += self.__decode(part.get_payload(decode=True))
+        email = {
+            'id': email_id,
+            'mailbox': mailbox,
+            'subject': self.__decode(parsed_email.get('Subject')),
+            'from': self.__decode(parsed_email.get('From')),
+            'to': self.__decode(parsed_email.get('To')),
+            'date': self.__decode(parsed_email.get('Date')),
+            'body_text': body_text,
+        }
+        return email
 
     def email_mark_seen(self, mail_id, mailbox=None):
         if mailbox and mailbox != self.selected_mailbox:

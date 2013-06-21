@@ -101,8 +101,9 @@ def show_mailbox(mailbox):
         'replace_context_menu': True,
         'context_menu': context_menu(mailbox, email),
         'path': plugin.url_for(
-            endpoint='show_mailbox',
-            mailbox=email['id'],
+            endpoint='email_show',
+            mailbox=email['mailbox'],
+            email_id=email['id']
         )
     } for email in client.get_emails(mailbox)]
     return plugin.finish(items)
@@ -130,6 +131,25 @@ def email_delete(mailbox, email_id):
         return
     client.email_delete(email_id, mailbox)
     _refresh_view()
+
+
+@plugin.route('/<mailbox>/<email_id>/show')
+def email_show(mailbox, email_id):
+    xbmc.executebuiltin('ActivateWindow(%d)' % 10147)
+    window = xbmcgui.Window(10147)
+    email = client.get_email(email_id, mailbox)
+    header = '%s - %s' % (email['from'], email['subject'])
+    text = '\r\n'.join((
+        '=====================================================',
+        '[B]From:[/B] %s' % email['from'],
+        '[B]To:[/B] %s' % email['to'],
+        '[B]Date:[/B] %s' % email['date'],
+        '[B]Subject:[/B] %s' % email['subject'],
+        '=====================================================',
+        email['body_text'],
+    ))
+    window.getControl(1).setLabel(header)
+    window.getControl(5).setText(text)
 
 
 def _run(*args, **kwargs):
