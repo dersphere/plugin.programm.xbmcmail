@@ -132,6 +132,7 @@ class XBMCMailClient(object):
 
         emails = [{
             'id': email_id,
+            'mailbox': mailbox,
             'subject': self.__parse_header(email.get('Subject')),
             'from': self.__parse_header(email.get('From')),
             'unseen': not 'seen' in flags_str.lower(),
