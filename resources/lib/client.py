@@ -55,6 +55,10 @@ class XBMCMailClient(object):
         self.log('connecting to server %s' % host)
         self.selected_mailbox = None
         self.logged_in = False
+        if not username or not password:
+            raise InvalidCredentials
+        if not host:
+            raise InvalidHost
         cls = imaplib.IMAP4_SSL if use_ssl else imaplib.IMAP4
         try:
             self.connection = cls(host)
