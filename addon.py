@@ -23,7 +23,16 @@ from resources.lib.client import (
 )
 
 STRINGS = {
-    # Root menu entries
+    'email_mark_seen': 30000,
+    'email_mark_unseen': 30001,
+    'email_delete': 30002,
+    'delete': 30003,
+    'are_you_sure': 30004,
+    'select_provider': 30005,
+    'connection_error': 30006,
+    'wrong_credentials': 30007,
+    'want_set_now': 30008,
+    'wrong_host': 30009,
 }
 
 
