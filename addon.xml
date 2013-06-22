@@ -11,7 +11,7 @@
         <language />
         <platform>all</platform>
         <website></website>
-        <source></source>
+        <source>https://github.com/dersphere/plugin.programm.xbmcmail.git</source>
         <forum></forum>
         <email>sphere@dersphere.de</email>
         <license>GNU GENERAL PUBLIC LICENSE. Version 2, June 1991</license>
