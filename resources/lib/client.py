@@ -29,15 +29,19 @@ DEFAULT_SEARCH_CRITERIA = 'UNDELETED'
 DEFAULT_MAILBOX_STATS = '(MESSAGES UNSEEN)'
 
 
+class LoginError(Exception):
+    pass
+
+
 class UnknownError(Exception):
     pass
 
 
-class InvalidCredentials(Exception):
+class InvalidCredentials(LoginError):
     pass
 
 
-class InvalidHost(Exception):
+class InvalidHost(LoginError):
     pass
 
 
@@ -63,7 +67,7 @@ class XBMCMailClient(object):
             if 'credentials' in error.message.lower():
                 raise InvalidCredentials(error)
             else:
-                raise UnknownError(error)
+                raise LoginError(error)
         self.logged_in = True
         self.username = username
         self.host = host
@@ -82,7 +86,7 @@ class XBMCMailClient(object):
         try:
             total, unseen = self.re_status_response.match(line).groups()
         except AttributeError:
-            return (0, 0)
+            return 0, 0
         return total, unseen
 
     def __decode(self, line):
@@ -152,7 +156,7 @@ class XBMCMailClient(object):
                 mailbox['unseen'] = unseen
         return mailboxes
 
-    def get_emails(self, mailbox=None, limit=10, offset=0):
+    def get_emails(self, mailbox=None, limit=50, offset=0):
         email_ids = self._get_email_ids(mailbox)
         email_ids = email_ids[offset:limit + offset]
 
