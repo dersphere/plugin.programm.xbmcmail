@@ -4,6 +4,7 @@
     <!-- Settings -->
     <string id="30300">Username</string>
     <string id="30301">Password</string>
-    <string id="30302">Server</string>
+    <string id="30302">IMAP Host</string>
     <string id="30303">Use SSL</string>
+    <string id="30304">Email-Provider</string>
 </strings>

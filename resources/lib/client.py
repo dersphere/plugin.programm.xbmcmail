@@ -19,6 +19,7 @@
 
 import imaplib
 import re
+import socket
 from email.parser import HeaderParser, Parser
 from email.Header import decode_header
 
@@ -36,6 +37,10 @@ class InvalidCredentials(Exception):
     pass
 
 
+class InvalidHost(Exception):
+    pass
+
+
 class XBMCMailClient(object):
 
     re_list_response = re.compile(r'\((.*?)\) "(.*)" (.*)')
@@ -44,17 +49,21 @@ class XBMCMailClient(object):
 
     def __init__(self, username=None, password=None, host=None, use_ssl=True):
         self.log('connecting to server %s' % host)
+        self.selected_mailbox = None
+        self.logged_in = False
         cls = imaplib.IMAP4_SSL if use_ssl else imaplib.IMAP4
         try:
             self.connection = cls(host)
             self.connection.login(username, password)
+        except socket.error, error:
+            self.log(error)
+            raise InvalidHost(error)
         except cls.error, error:
             self.log(error)
             if 'credentials' in error.message.lower():
                 raise InvalidCredentials(error)
             else:
                 raise UnknownError(error)
-        self.selected_mailbox = None
         self.logged_in = True
         self.username = username
         self.host = host

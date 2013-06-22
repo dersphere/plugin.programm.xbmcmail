@@ -18,7 +18,9 @@
 #
 
 from xbmcswift2 import Plugin, xbmc, xbmcgui
-from resources.lib.client import XBMCMailClient, InvalidCredentials
+from resources.lib.client import (
+    XBMCMailClient, InvalidCredentials, InvalidHost
+)
 
 STRINGS = {
     # Root menu entries
@@ -30,6 +32,9 @@ plugin = Plugin()
 
 @plugin.route('/')
 def show_mailboxes():
+    client = _login()
+    if not client:
+        return
 
     def _format_label(mailbox):
         label = mailbox['name']
@@ -53,6 +58,9 @@ def show_mailboxes():
 
 @plugin.route('/mailbox/<mailbox>/')
 def show_mailbox(mailbox):
+    client = _login()
+    if not client:
+        return
 
     def context_menu(mailbox, email):
         items = []
@@ -111,18 +119,27 @@ def show_mailbox(mailbox):
 
 @plugin.route('/mailbox/<mailbox>/<email_id>/mark_seen')
 def email_mark_seen(mailbox, email_id):
+    client = _login()
+    if not client:
+        return
     client.email_mark_seen(email_id, mailbox)
     _refresh_view()
 
 
 @plugin.route('/mailbox/<mailbox>/<email_id>/mark_unseen')
 def email_mark_unseen(mailbox, email_id):
+    client = _login()
+    if not client:
+        return
     client.email_mark_unseen(email_id, mailbox)
     _refresh_view()
 
 
 @plugin.route('/mailbox/<mailbox>/<email_id>/delete')
 def email_delete(mailbox, email_id):
+    client = _login()
+    if not client:
+        return
     confirmed = xbmcgui.Dialog().yesno(
         _('delete'),
         _('are_you_sure')
@@ -135,6 +152,9 @@ def email_delete(mailbox, email_id):
 
 @plugin.route('/mailbox/<mailbox>/<email_id>/show')
 def email_show(mailbox, email_id):
+    client = _login()
+    if not client:
+        return
     xbmc.executebuiltin('ActivateWindow(%d)' % 10147)
     window = xbmcgui.Window(10147)
     email = client.get_email(email_id, mailbox)
@@ -150,6 +170,41 @@ def email_show(mailbox, email_id):
     ))
     window.getControl(1).setLabel(header)
     window.getControl(5).setText(text)
+
+
+def ask_provider():
+    providers = [
+        {'name': 'Custom',
+         'imap_host': ''},
+        {'name': 'Gmail',
+         'imap_host': 'imap.gmail.com',
+         'use_ssl': 'true'},
+        {'name': 'Yahoo',
+         'imap_host': 'imap.mail.yahoo.com',
+         'use_ssl': 'true'},
+        {'name': 'iCloud',
+         'imap_host': 'imap.mail.me.com',
+         'use_ssl': 'true'},
+    ]
+    selected = xbmcgui.Dialog().select(
+        _('select_provider'), [p['name'] for p in providers]
+    )
+    if selected >= 0:
+        return providers[selected]
+
+
+@plugin.route('/settings/set_provider')
+def set_default_list():
+    provider = ask_provider()
+    if provider:
+        plugin.set_setting('provider', provider['name'])
+        for k, v in provider.iteritems():
+            if k == 'name':
+                plugin.set_setting('provider', v)
+            else:
+                plugin.set_setting(k, v)
+    else:
+        plugin.set_setting('provider', 'Custom')
 
 
 def _run(*args, **kwargs):
@@ -171,13 +226,22 @@ def _login():
             client = XBMCMailClient(
                 username=plugin.get_setting('username', unicode),
                 password=plugin.get_setting('password', unicode),
-                host=plugin.get_setting('host', unicode),
+                host=plugin.get_setting('imap_host', unicode),
                 use_ssl=plugin.get_setting('use_ssl', bool),
             )
         except InvalidCredentials:
             try_again = xbmcgui.Dialog().yesno(
                 _('connection_error'),
                 _('wrong_credentials'),
+                _('want_set_now')
+            )
+            if not try_again:
+                return
+            plugin.open_settings()
+        except InvalidHost:
+            try_again = xbmcgui.Dialog().yesno(
+                _('connection_error'),
+                _('wrong_host'),
                 _('want_set_now')
             )
             if not try_again:
@@ -197,7 +261,4 @@ def _(string_id):
 
 
 if __name__ == '__main__':
-    client = _login()
-    if client:
-        plugin.run()
-        client.logout()
+    plugin.run()
