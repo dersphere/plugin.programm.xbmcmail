@@ -73,8 +73,9 @@ def show_mailbox(mailbox, page):
     if not client:
         return
 
+    page = int(page)
     limit = 50
-    offset = (int(page) - 1) * limit
+    offset = (page - 1) * limit
 
     def context_menu(mailbox, email):
         items = []
@@ -119,7 +120,7 @@ def show_mailbox(mailbox, page):
         return s.replace('\r\n', '')
 
     emails, has_next_page = client.get_emails(mailbox, limit, offset)
-    has_prev_page = int(page) > 1
+    has_prev_page = page > 1
     items = [{
         'label': _format_label(email),
         'replace_context_menu': True,
@@ -133,23 +134,23 @@ def show_mailbox(mailbox, page):
     } for i, email in enumerate(emails)]
     if has_next_page:
         items.append({
-            'label': '>> %s %s >>' % (_('page'), (int(page) + 1)),
+            'label': '>> %s %s >>' % (_('page'), (page + 1)),
             'info': {'count': len(emails) + 2},
             'path': plugin.url_for(
                 endpoint='show_mailbox_page',
                 mailbox=mailbox,
-                page=(int(page) + 1),
+                page=(page + 1),
                 is_update='true',
             )
         })
     if has_prev_page:
         items.append({
-            'label': '<< %s %s <<' % (_('page'), (int(page) - 1)),
+            'label': '<< %s %s <<' % (_('page'), (page - 1)),
             'info': {'count': 0},
             'path': plugin.url_for(
                 endpoint='show_mailbox_page',
                 mailbox=mailbox,
-                page=(int(page) - 1),
+                page=(page - 1),
                 is_update='true',
             )
         })
