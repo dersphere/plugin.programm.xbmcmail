@@ -33,6 +33,7 @@ STRINGS = {
     'wrong_credentials': 30007,
     'want_set_now': 30008,
     'wrong_host': 30009,
+    'page': 30010,
 }
 
 
@@ -65,11 +66,15 @@ def show_mailboxes():
     return plugin.finish(items)
 
 
-@plugin.route('/mailbox/<mailbox>/')
-def show_mailbox(mailbox):
+@plugin.route('/mailbox/<mailbox>/', options={'page': '1'})
+@plugin.route('/mailbox/<mailbox>/<page>/', name='show_mailbox_page')
+def show_mailbox(mailbox, page):
     client = _login()
     if not client:
         return
+
+    limit = 50
+    offset = (int(page) - 1) * limit
 
     def context_menu(mailbox, email):
         items = []
@@ -113,17 +118,46 @@ def show_mailbox(mailbox):
     def _format_subject(s):
         return s.replace('\r\n', '')
 
+    emails, has_next_page = client.get_emails(mailbox, limit, offset)
+    has_prev_page = int(page) > 1
     items = [{
         'label': _format_label(email),
         'replace_context_menu': True,
+        'info': {'count': i + 1},
         'context_menu': context_menu(mailbox, email),
         'path': plugin.url_for(
             endpoint='email_show',
             mailbox=email['mailbox'],
             email_id=email['id']
         )
-    } for email in client.get_emails(mailbox)]
-    return plugin.finish(items)
+    } for i, email in enumerate(emails)]
+    if has_next_page:
+        items.append({
+            'label': '>> %s %s >>' % (_('page'), (int(page) + 1)),
+            'info': {'count': len(emails) + 2},
+            'path': plugin.url_for(
+                endpoint='show_mailbox_page',
+                mailbox=mailbox,
+                page=(int(page) + 1),
+                is_update='true',
+            )
+        })
+    if has_prev_page:
+        items.append({
+            'label': '<< %s %s <<' % (_('page'), (int(page) - 1)),
+            'info': {'count': 0},
+            'path': plugin.url_for(
+                endpoint='show_mailbox_page',
+                mailbox=mailbox,
+                page=(int(page) - 1),
+                is_update='true',
+            )
+        })
+    finish_kwargs = {
+        'update_listing': 'is_update' in plugin.request.args,
+        'sort_methods': ('playlist_order', )
+    }
+    return plugin.finish(items, **finish_kwargs)
 
 
 @plugin.route('/mailbox/<mailbox>/<email_id>/mark_seen')

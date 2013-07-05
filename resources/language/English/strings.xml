@@ -10,6 +10,7 @@
     <string id="30007">Wrong Credentials</string>
     <string id="30008">Do you want to open the Settings and try again?</string>
     <string id="30009">Wrong IMAP Server/SSL-Settings</string>
+    <string id="30010">Page</string>
     <!-- Settings -->
     <string id="30300">Username</string>
     <string id="30301">Password</string>

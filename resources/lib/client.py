@@ -92,6 +92,7 @@ class XBMCMailClient(object):
 
     def get_emails(self, mailbox=None, limit=50, offset=0):
         email_ids = self._get_email_ids(mailbox)
+        has_more = len(email_ids) > limit + offset
         email_ids = email_ids[offset:limit + offset]
 
         emails = [{
@@ -102,7 +103,7 @@ class XBMCMailClient(object):
             'unseen': not 'Seen' in flags,
         } for (email_id, flags), email in self._fetch_emails_by_ids(email_ids)]
         emails.reverse()
-        return emails
+        return emails, has_more
 
     def get_email(self, email_id, mailbox=None):
         if mailbox and mailbox != self.selected_mailbox:
