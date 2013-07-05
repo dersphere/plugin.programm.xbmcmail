@@ -59,7 +59,7 @@ def show_mailboxes():
         'label': _format_label(mailbox),
         'path': plugin.url_for(
             endpoint='show_mailbox',
-            mailbox=mailbox['name'],
+            mailbox=mailbox['raw_name'],
         )
     } for mailbox in client.get_mailboxes() if not mailbox['has_children']]
     return plugin.finish(items)

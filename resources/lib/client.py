@@ -93,10 +93,36 @@ class XBMCMailClient(object):
             return 0, 0
         return total, unseen
 
-    def __decode(self, line):
+    def __decode_header(self, line):
         if line:
             return decode_header(line)[0][0]
         return 'FIXME'
+
+    def __decode_modified_utf7(self, s):
+
+        def modified_deutf7(s):
+            s_utf7 = '+' + s.replace(',', '/') + '-'
+            return s_utf7.encode('latin-1').decode('utf-7')
+
+        r = []
+        _in = []
+        for c in s.decode('latin-1'):
+            if c == '&' and not _in:
+                _in.append('&')
+            elif c == '-' and _in:
+                if len(_in) == 1:
+                    r.append('&')
+                else:
+                    r.append(modified_deutf7(''.join(_in[1:])))
+                _in = []
+            elif _in:
+                _in.append(c)
+            else:
+                r.append(c)
+        if _in:
+            r.append(modified_deutf7(''.join(_in[1:])))
+
+        return ''.join(r)
 
     def _list_mailboxes(self):
         self.log('list')
@@ -150,12 +176,13 @@ class XBMCMailClient(object):
 
     def get_mailboxes(self, fetch_status=True):
         mailboxes = [{
-            'name': name,
+            'name': self.__decode_modified_utf7(name),
+            'raw_name': name,
             'has_children': 'HasChildren' in flags,
         } for flags, d, name in self._list_mailboxes()]
         if fetch_status:
             for mailbox in mailboxes:
-                total, unseen = self._get_mailbox_status(mailbox['name'])
+                total, unseen = self._get_mailbox_status(mailbox['raw_name'])
                 mailbox['total'] = total
                 mailbox['unseen'] = unseen
         return mailboxes
@@ -167,8 +194,8 @@ class XBMCMailClient(object):
         emails = [{
             'id': email_id,
             'mailbox': mailbox,
-            'subject': self.__decode(email.get('Subject')),
-            'from': self.__decode(email.get('From')),
+            'subject': self.__decode_header(email.get('Subject')),
+            'from': self.__decode_header(email.get('From')),
             'unseen': not 'Seen' in flags,
         } for (email_id, flags), email in self._fetch_emails_by_ids(email_ids)]
         emails.reverse()
@@ -188,14 +215,14 @@ class XBMCMailClient(object):
         body_text = ''
         for part in parsed_email.walk():
             if part.get_content_type() == 'text/plain':
-                body_text += self.__decode(part.get_payload(decode=True))
+                body_text += self.__decode_header(part.get_payload(decode=True))
         email = {
             'id': email_id,
             'mailbox': mailbox,
-            'subject': self.__decode(parsed_email.get('Subject')),
-            'from': self.__decode(parsed_email.get('From')),
-            'to': self.__decode(parsed_email.get('To')),
-            'date': self.__decode(parsed_email.get('Date')),
+            'subject': self.__decode_header(parsed_email.get('Subject')),
+            'from': self.__decode_header(parsed_email.get('From')),
+            'to': self.__decode_header(parsed_email.get('To')),
+            'date': self.__decode_header(parsed_email.get('Date')),
             'body_text': body_text,
         }
         return email
