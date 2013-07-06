@@ -4,6 +4,6 @@
  - fixed Mailbox Name decoding
  - cosmetics
 
-0.0.1 (unreleased)
+0.0.1 (22.06.2013)
  - initial release
  
