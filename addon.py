@@ -34,6 +34,7 @@ STRINGS = {
     'want_set_now': 30008,
     'wrong_host': 30009,
     'page': 30010,
+    'refresh_inbox': 30011,
 }
 
 
@@ -96,6 +97,12 @@ def show_mailbox(mailbox, page):
         items.append(
             (_('email_delete'),
              _view(endpoint='email_delete',
+                   mailbox=mailbox,
+                   email_id=email['id']))
+        )
+        items.append(
+            (_('refresh_inbox'),
+             _view(endpoint='refresh_inbox',
                    mailbox=mailbox,
                    email_id=email['id']))
         )
@@ -177,6 +184,11 @@ def email_mark_unseen(mailbox, email_id):
         return
     client.email_mark_unseen(email_id, mailbox)
     _refresh_view()
+    
+@plugin.route('/mailbox/<mailbox>')
+def refresh_inbox(mailbox):
+    return
+    _refresh_view()
 
 
 @plugin.route('/mailbox/<mailbox>/<email_id>/delete')
@@ -220,14 +232,29 @@ def ask_provider():
     providers = [
         {'name': 'Custom',
          'imap_host': ''},
-        {'name': 'Gmail',
+        {'name': '1und1.de',
+         'imap_host': 'imap.1und1.de',
+         'use_ssl': 'true'},
+        {'name': 'Arcor.de',
+         'imap_host': 'imap.arcor.de',
+         'use_ssl': 'true'},
+        {'name': 'Freenet.de',
+         'imap_host': 'mx.freenet.de',
+         'use_ssl': 'false'},
+        {'name': 'Gmail.com',
          'imap_host': 'imap.gmail.com',
          'use_ssl': 'true'},
-        {'name': 'Yahoo',
-         'imap_host': 'imap.mail.yahoo.com',
+         {'name': 'iCloud.com',
+          'imap_host': 'imap.mail.me.com',
+          'use_ssl': 'true'},
+        {'name': 'T-Online.de',
+         'imap_host': 'secureimap.t-online.de',
          'use_ssl': 'true'},
-        {'name': 'iCloud',
-         'imap_host': 'imap.mail.me.com',
+        {'name': 'Web.de',
+         'imap_host': 'imap.web.de',
+         'use_ssl': 'false'},
+        {'name': 'Yahoo.com',
+         'imap_host': 'imap.mail.yahoo.com',
          'use_ssl': 'true'},
     ]
     selected = xbmcgui.Dialog().select(
@@ -306,3 +333,4 @@ def _(string_id):
 
 if __name__ == '__main__':
     plugin.run()
+
