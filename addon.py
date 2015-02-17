@@ -63,7 +63,7 @@ def show_mailboxes():
             endpoint='show_mailbox',
             mailbox=mailbox['raw_name'],
         )
-    } for mailbox in client.get_mailboxes() if not mailbox['has_children']]
+    } for mailbox in client.get_mailboxes()]
     return plugin.finish(items)
 
 

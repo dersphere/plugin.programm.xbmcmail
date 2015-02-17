@@ -92,6 +92,8 @@ class XBMCMailClient(object):
 
     def get_emails(self, mailbox=None, limit=50, offset=0):
         email_ids = self._get_email_ids(mailbox)
+        if not email_ids:
+            return [], False
         has_more = len(email_ids) > limit + offset
         email_ids = email_ids[offset:limit + offset]
 
